@@ -11,7 +11,11 @@ import { formatLocalizedDate, useLanguage } from '@/lib/languageContext';
 interface HarvestingRecord {
   _id: string;
   village: string;
+  villageHi?: string;
+  villageTe?: string;
   farmerName: string;
+  farmerNameHi?: string;
+  farmerNameTe?: string;
   date: string;
   hoursWorked: number;
   startTime?: string;
@@ -20,7 +24,7 @@ interface HarvestingRecord {
 }
 
 export default function HarvestingRecords() {
-  const { language, t, displayText } = useLanguage();
+  const { language, t, displayText, displayExact } = useLanguage();
   const [records, setRecords] = useState<HarvestingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -69,6 +73,10 @@ export default function HarvestingRecords() {
     setShowForm(false);
     setEditingRecord(null);
     fetchRecords();
+  };
+  const getVillageLabel = (village: string) => {
+    const record = records.find((item) => item.village === village);
+    return displayExact(village, record?.villageHi, record?.villageTe);
   };
 
   return (
@@ -125,7 +133,7 @@ export default function HarvestingRecords() {
             onClick={() => setFilterVillage(village)}
             className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
           >
-            {displayText(village)}
+            {getVillageLabel(village)}
           </Button>
         ))}
       </div>
@@ -134,7 +142,7 @@ export default function HarvestingRecords() {
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
           <CardTitle className="text-white">
-            {filterVillage ? `${displayText(filterVillage)} - ` : ''}{t('Harvest Sessions')}
+            {filterVillage ? `${getVillageLabel(filterVillage)} - ` : ''}{t('Harvest Sessions')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -162,8 +170,8 @@ export default function HarvestingRecords() {
                       <td className="px-4 py-3 text-slate-200">
                         {formatLocalizedDate(record.date, language)}
                       </td>
-                      <td className="px-4 py-3 text-slate-200">{displayText(record.village)}</td>
-                      <td className="px-4 py-3 text-slate-200">{displayText(record.farmerName)}</td>
+                      <td className="px-4 py-3 text-slate-200">{displayExact(record.village, record.villageHi, record.villageTe)}</td>
+                      <td className="px-4 py-3 text-slate-200">{displayExact(record.farmerName, record.farmerNameHi, record.farmerNameTe)}</td>
                       <td className="px-4 py-3 text-blue-400 font-semibold">
                         {formatTime(record.hoursWorked)}
                       </td>

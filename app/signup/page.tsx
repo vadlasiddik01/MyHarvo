@@ -65,7 +65,7 @@ export default function SignupPage() {
       }
 
       setSuccess('Account created successfully! Redirecting...');
-      setUser(data.userId, data.username);
+      setUser(data.userId, data.username, data.usernameHi, data.usernameTe);
       
       setTimeout(() => {
         router.push('/');

@@ -9,6 +9,8 @@ import { formatLocalizedDate, useLanguage } from '@/lib/languageContext';
 interface DieselRecord {
   _id: string;
   village: string;
+  villageHi?: string;
+  villageTe?: string;
   date: string;
   litres: number;
   costPerLitre: number;
@@ -17,7 +19,7 @@ interface DieselRecord {
 }
 
 export default function DieselManagement() {
-  const { language, t, displayText } = useLanguage();
+  const { language, t, displayText, displayExact } = useLanguage();
   const [records, setRecords] = useState<DieselRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -27,6 +29,8 @@ export default function DieselManagement() {
 
   const [formData, setFormData] = useState({
     village: '',
+    villageHi: '',
+    villageTe: '',
     date: new Date().toISOString().split('T')[0],
     litres: 0,
     costPerLitre: 0,
@@ -101,6 +105,8 @@ export default function DieselManagement() {
     setEditingRecord(record);
     setFormData({
       village: record.village,
+      villageHi: record.villageHi || '',
+      villageTe: record.villageTe || '',
       date: record.date.split('T')[0],
       litres: record.litres,
       costPerLitre: record.costPerLitre,
@@ -126,6 +132,8 @@ export default function DieselManagement() {
   const resetForm = () => {
     setFormData({
       village: '',
+      villageHi: '',
+      villageTe: '',
       date: new Date().toISOString().split('T')[0],
       litres: 0,
       costPerLitre: 0,
@@ -136,6 +144,10 @@ export default function DieselManagement() {
 
   const totalLitres = records.reduce((sum, r) => sum + r.litres, 0);
   const totalSpent = records.reduce((sum, r) => sum + r.totalCost, 0);
+  const getVillageLabel = (village: string) => {
+    const record = records.find((item) => item.village === village);
+    return displayExact(village, record?.villageHi, record?.villageTe);
+  };
 
   return (
     <div className="space-y-6">
@@ -178,6 +190,28 @@ export default function DieselManagement() {
                     onChange={handleInputChange}
                     placeholder="Village name"
                     required
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-200 mb-2">{t('Village')} Hindi</label>
+                  <input
+                    type="text"
+                    name="villageHi"
+                    value={formData.villageHi || ''}
+                    onChange={handleInputChange}
+                    placeholder="गांव का सही नाम"
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-200 mb-2">{t('Village')} Telugu</label>
+                  <input
+                    type="text"
+                    name="villageTe"
+                    value={formData.villageTe || ''}
+                    onChange={handleInputChange}
+                    placeholder="గ్రామం సరైన పేరు"
                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   />
                 </div>
@@ -303,7 +337,7 @@ export default function DieselManagement() {
             onClick={() => setFilterVillage(village)}
             className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
           >
-            {displayText(village)}
+            {getVillageLabel(village)}
           </Button>
         ))}
       </div>
@@ -312,7 +346,7 @@ export default function DieselManagement() {
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
           <CardTitle className="text-white">
-            {filterVillage ? `${displayText(filterVillage)} - ` : ''}{t('Diesel Entries')}
+            {filterVillage ? `${getVillageLabel(filterVillage)} - ` : ''}{t('Diesel Entries')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -340,7 +374,7 @@ export default function DieselManagement() {
                       <td className="px-4 py-3 text-slate-200">
                         {formatLocalizedDate(record.date, language)}
                       </td>
-                      <td className="px-4 py-3 text-slate-200">{displayText(record.village)}</td>
+                      <td className="px-4 py-3 text-slate-200">{displayExact(record.village, record.villageHi, record.villageTe)}</td>
                       <td className="px-4 py-3 text-right text-slate-200">
                         {record.litres.toFixed(1)}
                       </td>

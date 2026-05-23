@@ -10,6 +10,8 @@ import { formatLocalizedDate, useLanguage } from '@/lib/languageContext';
 interface HarvestingRecord {
   _id: string;
   village: string;
+  villageHi?: string;
+  villageTe?: string;
   hoursWorked: number;
   date: string;
 }
@@ -28,7 +30,7 @@ interface ServiceRecord {
 }
 
 export default function Dashboard() {
-  const { language, t, displayText } = useLanguage();
+  const { language, t, displayText, displayExact } = useLanguage();
   const [harvestingData, setHarvestingData] = useState<HarvestingRecord[]>([]);
   const [dieselData, setDieselData] = useState<DieselRecord[]>([]);
   const [serviceData, setServiceData] = useState<ServiceRecord[]>([]);
@@ -73,10 +75,13 @@ export default function Dashboard() {
       existing.minutes += minutes;
       existing.hours = toHours(existing.minutes);
       existing.count += 1;
+      if (record.villageHi || record.villageTe) {
+        existing.villageLabel = displayExact(record.village, record.villageHi, record.villageTe);
+      }
     } else {
       acc.push({
         village: record.village,
-        villageLabel: displayText(record.village),
+        villageLabel: displayExact(record.village, record.villageHi, record.villageTe),
         minutes,
         hours: toHours(minutes),
         count: 1,

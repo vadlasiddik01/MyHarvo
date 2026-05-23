@@ -10,12 +10,14 @@ interface ServiceRecord {
   _id: string;
   date: string;
   description: string;
+  descriptionHi?: string;
+  descriptionTe?: string;
   cost: number;
   notes?: string;
 }
 
 export default function ServiceRepairs() {
-  const { language, t, displayText } = useLanguage();
+  const { language, t, displayText, displayExact } = useLanguage();
   const [records, setRecords] = useState<ServiceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -24,6 +26,8 @@ export default function ServiceRepairs() {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     description: '',
+    descriptionHi: '',
+    descriptionTe: '',
     cost: 0,
     notes: '',
   });
@@ -86,6 +90,8 @@ export default function ServiceRepairs() {
     setFormData({
       date: record.date.split('T')[0],
       description: record.description,
+      descriptionHi: record.descriptionHi || '',
+      descriptionTe: record.descriptionTe || '',
       cost: record.cost,
       notes: record.notes || '',
     });
@@ -109,6 +115,8 @@ export default function ServiceRepairs() {
     setFormData({
       date: new Date().toISOString().split('T')[0],
       description: '',
+      descriptionHi: '',
+      descriptionTe: '',
       cost: 0,
       notes: '',
     });
@@ -172,6 +180,31 @@ export default function ServiceRepairs() {
                   required
                   className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-200 mb-2">{t('Description')} Hindi</label>
+                  <input
+                    type="text"
+                    name="descriptionHi"
+                    value={formData.descriptionHi || ''}
+                    onChange={handleInputChange}
+                    placeholder="सही हिंदी विवरण"
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-200 mb-2">{t('Description')} Telugu</label>
+                  <input
+                    type="text"
+                    name="descriptionTe"
+                    value={formData.descriptionTe || ''}
+                    onChange={handleInputChange}
+                    placeholder="సరైన తెలుగు వివరణ"
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
               </div>
 
               <div>
@@ -263,7 +296,7 @@ export default function ServiceRepairs() {
                       <td className="px-4 py-3 text-slate-200">
                         {formatLocalizedDate(record.date, language)}
                       </td>
-                      <td className="px-4 py-3 text-slate-200">{displayText(record.description)}</td>
+                      <td className="px-4 py-3 text-slate-200">{displayExact(record.description, record.descriptionHi, record.descriptionTe)}</td>
                       <td className="px-4 py-3 text-right text-red-400 font-semibold">
                         ₹{record.cost.toFixed(0)}
                       </td>

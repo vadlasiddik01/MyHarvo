@@ -60,7 +60,13 @@ export async function POST(req: NextRequest) {
     await setAuthCookie(token);
 
     return NextResponse.json(
-      { success: true, userId: user._id, username: user.username },
+      {
+        success: true,
+        userId: user._id,
+        username: user.username,
+        usernameHi: user.usernameHi || '',
+        usernameTe: user.usernameTe || '',
+      },
       { status: 200 }
     );
   } catch (error) {

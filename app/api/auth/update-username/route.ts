@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     await connectDB();
-    const { newUsername } = await req.json();
+    const { newUsername, usernameHi = '', usernameTe = '' } = await req.json();
 
     if (!newUsername || newUsername.trim().length < 3) {
       return NextResponse.json(
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const user = await User.findByIdAndUpdate(
       userId,
-      { username: newUsername },
+      { username: newUsername, usernameHi, usernameTe },
       { new: true }
     );
 
@@ -43,7 +43,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, username: newUsername });
+    return NextResponse.json({
+      success: true,
+      username: newUsername,
+      usernameHi: user.usernameHi || '',
+      usernameTe: user.usernameTe || '',
+    });
   } catch (error: any) {
     console.log('[v0] Update username error:', error);
     return NextResponse.json(

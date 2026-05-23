@@ -71,7 +71,7 @@ export default function SigninPage() {
         return;
       }
 
-      setUser(data.userId, data.username);
+      setUser(data.userId, data.username, data.usernameHi, data.usernameTe);
       router.push('/');
     } catch (err) {
       setSignInError('An error occurred during sign in');

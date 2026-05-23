@@ -16,8 +16,8 @@ import { LanguageToggle, useLanguage } from '@/lib/languageContext';
 
 export default function Page() {
   const router = useRouter();
-  const { userId, username, isLoggedIn, logout, checkAuth } = useAuth();
-  const { t, displayText } = useLanguage();
+  const { userId, username, usernameHi, usernameTe, isLoggedIn, logout, checkAuth } = useAuth();
+  const { t, displayExact } = useLanguage();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mounted, setMounted] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -57,14 +57,14 @@ export default function Page() {
           {/* Header */}
           <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-white mb-2">{displayText('MyHarvo')}</h1>
+              <h1 className="text-2xl font-bold text-white mb-2">{displayExact('MyHarvo')}</h1>
               <p className="text-slate-400">{t('Track your harvesting operations, costs, and maintenance')}</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <LanguageToggle />
               <div className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
                 <User size={18} className="text-blue-400" />
-                <span className="text-white font-medium">{displayText(username)}</span>
+                <span className="text-white font-medium">{displayExact(username, usernameHi, usernameTe)}</span>
               </div>
               <Button
                 onClick={() => setShowProfile(true)}

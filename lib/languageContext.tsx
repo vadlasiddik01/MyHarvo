@@ -262,6 +262,7 @@ interface LanguageContextValue {
   setLanguage: (language: Language) => void;
   t: (text: string) => string;
   displayText: (text?: string | null) => string;
+  displayExact: (text?: string | null, hi?: string | null, te?: string | null) => string;
 }
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
@@ -364,7 +365,27 @@ export function localizeDynamicText(text: string | null | undefined, language: L
   if (language === 'en') return text;
 
   const exact = translateText(text, language);
-  return exact !== text ? exact : transliterateLatinText(text, language);
+  if (exact !== text) return exact;
+
+  const transliterated = transliterateLatinText(text, language);
+  return transliterated !== text ? `${transliterated} (${text})` : text;
+}
+
+export function localizeExactText(
+  text: string | null | undefined,
+  language: Language,
+  hi?: string | null,
+  te?: string | null
+): string {
+  if (!text) return '';
+  if (language === 'en') return text;
+
+  const exact = language === 'hi' ? hi : te;
+  if (exact?.trim()) {
+    return `${exact.trim()} (${text})`;
+  }
+
+  return localizeDynamicText(text, language);
 }
 
 const directWords: Record<Language, Record<string, string>> = {
@@ -532,6 +553,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       setLanguage: setLanguageState,
       t: (text: string) => translateText(text, language),
       displayText: (text?: string | null) => localizeDynamicText(text, language),
+      displayExact: (text?: string | null, hi?: string | null, te?: string | null) =>
+        localizeExactText(text, language, hi, te),
     }),
     [language]
   );

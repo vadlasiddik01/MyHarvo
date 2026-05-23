@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/authContext';
+import { useLanguage } from '@/lib/languageContext';
 import { X, Save, Lock, User } from 'lucide-react';
 
 interface ProfileProps {
@@ -11,8 +12,11 @@ interface ProfileProps {
 }
 
 export default function Profile({ onClose }: ProfileProps) {
-  const { username, setUsername } = useAuth();
+  const { username, usernameHi, usernameTe, setUsername } = useAuth();
+  const { displayExact } = useLanguage();
   const [editUsername, setEditUsername] = useState(username || '');
+  const [editUsernameHi, setEditUsernameHi] = useState(usernameHi || '');
+  const [editUsernameTe, setEditUsernameTe] = useState(usernameTe || '');
   const [editingUsername, setEditingUsername] = useState(false);
   const [showResetPin, setShowResetPin] = useState(false);
   const [pinForm, setPinForm] = useState({ password: '', newPin: '', confirmPin: '' });
@@ -30,7 +34,11 @@ export default function Profile({ onClose }: ProfileProps) {
       const response = await fetch('/api/auth/update-username', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newUsername: editUsername }),
+        body: JSON.stringify({
+          newUsername: editUsername,
+          usernameHi: editUsernameHi,
+          usernameTe: editUsernameTe,
+        }),
       });
 
       if (!response.ok) {
@@ -39,7 +47,8 @@ export default function Profile({ onClose }: ProfileProps) {
         return;
       }
 
-      setUsername(editUsername);
+      const data = await response.json();
+      setUsername(data.username, data.usernameHi, data.usernameTe);
       setEditingUsername(false);
       setMessage({ type: 'success', text: 'Username updated successfully' });
       setTimeout(() => setMessage(null), 3000);
@@ -132,6 +141,20 @@ export default function Profile({ onClose }: ProfileProps) {
                   placeholder="Enter new username"
                   className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                 />
+                <input
+                  type="text"
+                  value={editUsernameHi}
+                  onChange={e => setEditUsernameHi(e.target.value)}
+                  placeholder="Username exact Hindi"
+                  className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                />
+                <input
+                  type="text"
+                  value={editUsernameTe}
+                  onChange={e => setEditUsernameTe(e.target.value)}
+                  placeholder="Username exact Telugu"
+                  className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                />
                 <div className="flex gap-2">
                   <Button
                     onClick={handleSaveUsername}
@@ -145,6 +168,8 @@ export default function Profile({ onClose }: ProfileProps) {
                     onClick={() => {
                       setEditingUsername(false);
                       setEditUsername(username || '');
+                      setEditUsernameHi(usernameHi || '');
+                      setEditUsernameTe(usernameTe || '');
                     }}
                     className="flex-1 bg-slate-600 hover:bg-slate-500 text-white"
                   >
@@ -154,9 +179,14 @@ export default function Profile({ onClose }: ProfileProps) {
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <span className="text-slate-100 font-medium">{username}</span>
+                <span className="text-slate-100 font-medium">{displayExact(username, usernameHi, usernameTe)}</span>
                 <Button
-                  onClick={() => setEditingUsername(true)}
+                  onClick={() => {
+                    setEditUsername(username || '');
+                    setEditUsernameHi(usernameHi || '');
+                    setEditUsernameTe(usernameTe || '');
+                    setEditingUsername(true);
+                  }}
                   className="bg-blue-600 hover:bg-blue-700 text-white text-sm"
                 >
                   Edit
