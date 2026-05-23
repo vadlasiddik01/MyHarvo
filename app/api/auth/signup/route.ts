@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     await connectDB();
     const body = await req.json();
-    const { username, password, pin } = body;
+    const { username, usernameHi = '', usernameTe = '', password, pin } = body;
 
     // Validation
     if (!username || !password || !pin) {
@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
     // Create user
     const newUser = new User({
       username,
+      usernameHi,
+      usernameTe,
       passwordHash,
       pinHash,
     });
@@ -58,7 +60,13 @@ export async function POST(req: NextRequest) {
     await setAuthCookie(token);
 
     return NextResponse.json(
-      { success: true, userId: newUser._id, username: newUser.username, usernameHi: '', usernameTe: '' },
+      {
+        success: true,
+        userId: newUser._id,
+        username: newUser.username,
+        usernameHi: newUser.usernameHi || '',
+        usernameTe: newUser.usernameTe || '',
+      },
       { status: 201 }
     );
   } catch (error) {

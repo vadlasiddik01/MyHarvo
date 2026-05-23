@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/authContext';
-import { LanguageToggle } from '@/lib/languageContext';
+import { LanguageToggle, useLanguage } from '@/lib/languageContext';
 import { AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function SigninPage() {
   const router = useRouter();
   const { setUser } = useAuth();
+  const { t } = useLanguage();
   
   // Sign In State
   const [signInUsername, setSignInUsername] = useState('');
@@ -35,18 +36,18 @@ export default function SigninPage() {
     setSignInError('');
 
     if (!signInUsername.trim()) {
-      setSignInError('Username is required');
+      setSignInError(t('Username is required'));
       return;
     }
 
     if (signInMethod === 'password') {
       if (!signInPassword.trim()) {
-        setSignInError('Password is required');
+        setSignInError(t('Password is required'));
         return;
       }
     } else {
       if (!signInPin.trim() || signInPin.length !== 4) {
-        setSignInError('PIN must be exactly 4 digits');
+        setSignInError(t('PIN must be exactly 4 digits'));
         return;
       }
     }
@@ -67,14 +68,14 @@ export default function SigninPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setSignInError(data.error || 'Sign in failed');
+        setSignInError(t(data.error || 'Sign in failed'));
         return;
       }
 
       setUser(data.userId, data.username, data.usernameHi, data.usernameTe);
       router.push('/');
     } catch (err) {
-      setSignInError('An error occurred during sign in');
+      setSignInError(t('An error occurred during sign in'));
       console.error('[v0] Signin error:', err);
     } finally {
       setSignInLoading(false);
@@ -87,22 +88,22 @@ export default function SigninPage() {
     setResetSuccess('');
 
     if (!resetUsername.trim()) {
-      setResetError('Username is required');
+      setResetError(t('Username is required'));
       return;
     }
 
     if (!resetPassword.trim()) {
-      setResetError('Password is required');
+      setResetError(t('Password is required'));
       return;
     }
 
     if (!resetNewPin.trim() || resetNewPin.length !== 4) {
-      setResetError('New PIN must be exactly 4 digits');
+      setResetError(t('New PIN must be exactly 4 digits'));
       return;
     }
 
     if (!/^\d{4}$/.test(resetNewPin)) {
-      setResetError('PIN must contain only digits');
+      setResetError(t('PIN must contain only digits'));
       return;
     }
 
@@ -122,16 +123,16 @@ export default function SigninPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setResetError(data.error || 'PIN reset failed');
+        setResetError(t(data.error || 'PIN reset failed'));
         return;
       }
 
-      setResetSuccess('PIN reset successfully! You can now sign in with your new PIN.');
+      setResetSuccess(t('PIN reset successfully! You can now sign in with your new PIN.'));
       setResetUsername('');
       setResetPassword('');
       setResetNewPin('');
     } catch (err) {
-      setResetError('An error occurred during PIN reset');
+      setResetError(t('An error occurred during PIN reset'));
       console.error('[v0] Reset PIN error:', err);
     } finally {
       setResetLoading(false);
@@ -147,15 +148,15 @@ export default function SigninPage() {
         <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Welcome to MyHarvo</h1>
-            <p className="text-slate-400 text-sm">Sign in to your harvesting management account</p>
+            <h1 className="text-3xl font-bold text-white mb-2">{t('Welcome to MyHarvo')}</h1>
+            <p className="text-slate-400 text-sm">{t('Sign in to your harvesting management account')}</p>
           </div>
 
           {/* Tabs */}
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-slate-700 mb-6">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="reset">Reset PIN</TabsTrigger>
+              <TabsTrigger value="signin">{t('Sign In')}</TabsTrigger>
+              <TabsTrigger value="reset">{t('Reset PIN')}</TabsTrigger>
             </TabsList>
 
             {/* Sign In Tab */}
@@ -164,7 +165,7 @@ export default function SigninPage() {
                 {/* Username */}
                 <div>
                   <label className="block text-sm font-medium text-slate-200 mb-2">
-                    Username
+                    {t('Username')}
                   </label>
                   <input
                     type="text"
@@ -188,7 +189,7 @@ export default function SigninPage() {
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
                     >
-                      Password
+                      {t('Password')}
                     </button>
                     <button
                       type="button"
@@ -199,14 +200,14 @@ export default function SigninPage() {
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
                     >
-                      PIN
+                      {t('PIN')}
                     </button>
                   </div>
 
                   {signInMethod === 'password' ? (
                     <div>
                       <label className="block text-sm font-medium text-slate-200 mb-2">
-                        Password
+                        {t('Password')}
                       </label>
                       <div className="relative">
                         <input
@@ -229,7 +230,7 @@ export default function SigninPage() {
                   ) : (
                     <div>
                       <label className="block text-sm font-medium text-slate-200 mb-2">
-                        4-Digit PIN
+                        {t('4-Digit PIN')}
                       </label>
                       <input
                         type="password"
@@ -258,19 +259,19 @@ export default function SigninPage() {
                   disabled={signInLoading}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition"
                 >
-                  {signInLoading ? 'Signing In...' : 'Sign In'}
+                  {signInLoading ? t('Signing In...') : t('Sign In')}
                 </Button>
               </form>
 
               {/* Sign Up Link */}
               <div className="mt-6 text-center">
                 <p className="text-slate-400 text-sm">
-                  Don&apos;t have an account?{' '}
+                  {t("Don't have an account?")}{' '}
                   <button
                     onClick={() => router.push('/signup')}
                     className="text-blue-400 hover:text-blue-300 font-medium"
                   >
-                    Create one
+                    {t('Create Account')}
                   </button>
                 </p>
               </div>
@@ -282,7 +283,7 @@ export default function SigninPage() {
                 {/* Username */}
                 <div>
                   <label className="block text-sm font-medium text-slate-200 mb-2">
-                    Username
+                    {t('Username')}
                   </label>
                   <input
                     type="text"
@@ -297,7 +298,7 @@ export default function SigninPage() {
                 {/* Password */}
                 <div>
                   <label className="block text-sm font-medium text-slate-200 mb-2">
-                    Password
+                    {t('Password')}
                   </label>
                   <div className="relative">
                     <input
@@ -321,7 +322,7 @@ export default function SigninPage() {
                 {/* New PIN */}
                 <div>
                   <label className="block text-sm font-medium text-slate-200 mb-2">
-                    New 4-Digit PIN
+                    {t('New 4-digit PIN')}
                   </label>
                   <input
                     type="password"
@@ -356,7 +357,7 @@ export default function SigninPage() {
                   disabled={resetLoading}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition"
                 >
-                  {resetLoading ? 'Resetting PIN...' : 'Reset PIN'}
+                  {resetLoading ? t('Resetting PIN...') : t('Reset PIN')}
                 </Button>
               </form>
             </TabsContent>

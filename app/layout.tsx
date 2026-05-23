@@ -3,26 +3,21 @@ import { Analytics } from '@vercel/analytics/next'
 import { LanguageProvider } from '@/lib/languageContext'
 import './globals.css'
 
+const appIconUrl = process.env.NEXT_PUBLIC_APP_ICON_URL || '/myharvo-logo.jpg'
+
 export const metadata: Metadata = {
   title: 'MyHarvo - Harvesting Machine Management',
   description: 'Track harvesting records, diesel costs, and services for your harvesting machine',
-  generator: 'v0.app',
+  generator: 'MyHarvo',
   icons: {
     icon: [
       {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        url: appIconUrl,
+        type: 'image/jpeg',
       },
     ],
-    apple: '/apple-icon.png',
+    shortcut: appIconUrl,
+    apple: appIconUrl,
   },
 }
 
