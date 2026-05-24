@@ -5,6 +5,10 @@ const userSchema = new mongoose.Schema(
     username: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: true },
     pinHash: { type: String, required: true },
+    googleEmail: { type: String, unique: true, sparse: true },
+    googleSub: { type: String, unique: true, sparse: true },
+    googleName: { type: String },
+    googlePicture: { type: String },
   },
   { timestamps: true }
 );

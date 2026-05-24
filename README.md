@@ -80,7 +80,10 @@ A comprehensive web application for tracking and managing harvesting machine ope
    Create a `.env.local` file in the root directory:
    ```
    MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>
+   NEXT_PUBLIC_GOOGLE_CLIENT_ID=<google-oauth-client-id>
    ```
+
+   `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is required for Google signup/signin and for uploading reports to the signed-in user's Google Drive. Enable the Google Drive API for the Google Cloud project and add your app origin to the OAuth client's authorized JavaScript origins. A Google API key by itself cannot sign users in or upload/delete files in a user's Drive; the app uses the user's Google email after OAuth consent.
 
 4. **Run the development server**:
    ```bash

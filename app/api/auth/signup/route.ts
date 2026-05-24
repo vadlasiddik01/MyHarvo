@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB } from '@/lib/mongodb';
+import { connectDB, getDatabaseErrorMessage } from '@/lib/mongodb';
 import { User } from '@/lib/schemas';
 import { hashPassword, hashPin, setAuthCookie, createToken } from '@/lib/auth';
 import { exactNameRegex, normalizeName } from '@/lib/normalize';
+import { verifyGoogleAccessToken } from '@/lib/googleAuth';
 
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
     const body = await req.json();
-    const { password, pin } = body;
+    const { password, pin, googleAccessToken } = body;
     const username = normalizeName(body.username);
+    const googleProfile = googleAccessToken ? await verifyGoogleAccessToken(googleAccessToken) : null;
+
+    if (googleAccessToken && !googleProfile) {
+      return NextResponse.json(
+        { error: 'Google sign-up could not be verified' },
+        { status: 401 }
+      );
+    }
 
     // Validation
     if (!username || !password || !pin) {
@@ -42,6 +51,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (googleProfile) {
+      const existingGoogleUser = await User.findOne({
+        $or: [{ googleSub: googleProfile.sub }, { googleEmail: googleProfile.email }],
+      });
+
+      if (existingGoogleUser) {
+        return NextResponse.json(
+          { error: 'This Google account is already linked to an account' },
+          { status: 409 }
+        );
+      }
+    }
+
     // Hash password and PIN
     const passwordHash = await hashPassword(password);
     const pinHash = await hashPin(pin);
@@ -51,6 +73,14 @@ export async function POST(req: NextRequest) {
       username,
       passwordHash,
       pinHash,
+      ...(googleProfile
+        ? {
+            googleEmail: googleProfile.email,
+            googleSub: googleProfile.sub,
+            googleName: googleProfile.name,
+            googlePicture: googleProfile.picture,
+          }
+        : {}),
     });
 
     await newUser.save();
@@ -69,6 +99,14 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error('[v0] Signup error:', error);
+    const databaseError = getDatabaseErrorMessage(error);
+    if (databaseError) {
+      return NextResponse.json(
+        { error: databaseError },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       { error: 'Signup failed' },
       { status: 500 }

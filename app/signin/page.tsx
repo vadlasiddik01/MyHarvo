@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/authContext';
 import { LanguageToggle, useLanguage } from '@/lib/languageContext';
 import { AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { getGoogleAccessToken } from '@/lib/googleOAuthClient';
 
 export default function SigninPage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function SigninPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [signInError, setSignInError] = useState('');
   const [signInLoading, setSignInLoading] = useState(false);
+  const [googleSignInLoading, setGoogleSignInLoading] = useState(false);
 
   // Reset PIN State
   const [resetUsername, setResetUsername] = useState('');
@@ -79,6 +81,34 @@ export default function SigninPage() {
       console.error('[v0] Signin error:', err);
     } finally {
       setSignInLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setSignInError('');
+    setGoogleSignInLoading(true);
+
+    try {
+      const googleAccessToken = await getGoogleAccessToken();
+      const response = await fetch('/api/auth/google-signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ googleAccessToken }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setSignInError(t(data.error || 'Google sign in failed'));
+        return;
+      }
+
+      setUser(data.userId, data.username);
+      router.push('/');
+    } catch (err) {
+      setSignInError(err instanceof Error ? err.message : t('Google sign in failed'));
+    } finally {
+      setGoogleSignInLoading(false);
     }
   };
 
@@ -161,6 +191,21 @@ export default function SigninPage() {
 
             {/* Sign In Tab */}
             <TabsContent value="signin">
+              <Button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleSignInLoading || signInLoading}
+                className="mb-5 w-full border border-slate-600 bg-slate-700 text-white hover:bg-slate-600"
+              >
+                {googleSignInLoading ? t('Signing In...') : 'Sign in with Google'}
+              </Button>
+
+              <div className="mb-5 flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-700" />
+                <span className="text-xs text-slate-500">or</span>
+                <div className="h-px flex-1 bg-slate-700" />
+              </div>
+
               <form onSubmit={handleSignIn} className="space-y-5">
                 {/* Username */}
                 <div>

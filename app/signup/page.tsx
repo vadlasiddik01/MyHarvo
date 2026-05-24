@@ -7,6 +7,12 @@ import { useAuth } from '@/lib/authContext';
 import { LanguageToggle, useLanguage } from '@/lib/languageContext';
 import { AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { normalizeName } from '@/lib/normalize';
+import { getGoogleAccessToken } from '@/lib/googleOAuthClient';
+
+interface GoogleSignupState {
+  accessToken: string;
+  email: string;
+}
 
 export default function SignupPage() {
   const router = useRouter();
@@ -19,6 +25,41 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleAccount, setGoogleAccount] = useState<GoogleSignupState | null>(null);
+
+  const fetchGoogleEmail = async (accessToken: string) => {
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      throw new Error('Could not read Google account email');
+    }
+
+    const profile = await response.json();
+    if (!profile.email) {
+      throw new Error('Google account email was not available');
+    }
+
+    return String(profile.email);
+  };
+
+  const handleGoogleSignup = async () => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      const accessToken = await getGoogleAccessToken();
+      const email = await fetchGoogleEmail(accessToken);
+      setGoogleAccount({ accessToken, email });
+      setSuccess(`Google account selected: ${email}. Now create your username, password, and PIN.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('Google sign-up failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +97,12 @@ export default function SignupPage() {
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: normalizeName(username), password, pin }),
+        body: JSON.stringify({
+          username: normalizeName(username),
+          password,
+          pin,
+          googleAccessToken: googleAccount?.accessToken,
+        }),
       });
 
       const data = await response.json();
@@ -98,6 +144,22 @@ export default function SignupPage() {
             <p className="text-amber-100 text-sm">
               <strong>{t('Important:')}</strong> {t('Remember your username and password - they cannot be changed later!')}
             </p>
+          </div>
+
+          <div className="mb-6 space-y-3">
+            <Button
+              type="button"
+              onClick={handleGoogleSignup}
+              disabled={loading}
+              className="w-full border border-slate-600 bg-slate-700 text-white hover:bg-slate-600"
+            >
+              {googleAccount ? `Google selected: ${googleAccount.email}` : 'Continue with Google'}
+            </Button>
+            {googleAccount && (
+              <p className="text-xs text-slate-400">
+                Finish signup with your MyHarvo username, password, and 4-digit PIN.
+              </p>
+            )}
           </div>
 
           {/* Form */}

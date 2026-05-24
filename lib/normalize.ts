@@ -6,8 +6,9 @@ export function normalizeNameFields<T extends Record<string, any>>(data: T, fiel
   const normalized = { ...data };
 
   for (const field of fields) {
-    if (typeof normalized[field] === 'string') {
-      normalized[field] = normalizeName(normalized[field]);
+    const key = field as keyof T;
+    if (typeof normalized[key] === 'string') {
+      normalized[key] = normalizeName(normalized[key]) as T[keyof T];
     }
   }
 

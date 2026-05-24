@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Printer } from 'lucide-react';
+import { Check, Loader2, Printer, UploadCloud } from 'lucide-react';
 import { formatTimeWithColon } from '@/lib/timeUtils';
 import { useAuth } from '@/lib/authContext';
 import { formatLocalizedDate, getLanguageLocale, useLanguage } from '@/lib/languageContext';
 import { normalizeName } from '@/lib/normalize';
+import { getGoogleAccessToken } from '@/lib/googleOAuthClient';
 
 interface HarvestingRecord {
   _id: string;
@@ -35,13 +36,24 @@ interface ServiceRecord {
   cost: number;
 }
 
+interface UploadedReport {
+  fileId: string;
+  fileName: string;
+  googleEmail: string;
+  webViewLink?: string;
+}
+
+const GOOGLE_SCOPE = 'openid email https://www.googleapis.com/auth/drive.file';
+
 export default function Reports() {
-  const { username } = useAuth();
+  const { userId, username } = useAuth();
   const { language, t, displayText } = useLanguage();
   const [harvestingData, setHarvestingData] = useState<HarvestingRecord[]>([]);
   const [dieselData, setDieselData] = useState<DieselRecord[]>([]);
   const [serviceData, setServiceData] = useState<ServiceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [uploadedReport, setUploadedReport] = useState<UploadedReport | null>(null);
   const [selectedVillage, setSelectedVillage] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -51,6 +63,27 @@ export default function Reports() {
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  const reportKey = [
+    'myharvo-report',
+    userId || 'guest',
+    selectedVillage || 'all',
+    startDate || 'start',
+    endDate || 'end',
+    hourlyRate || 0,
+  ].join('|');
+
+  useEffect(() => {
+    if (!reportKey) return;
+    try {
+      const stored = localStorage.getItem(reportKey);
+      const parsed = stored ? JSON.parse(stored) : null;
+      setUploadedReport(parsed?.fileId && parsed?.googleEmail ? parsed : null);
+    } catch {
+      localStorage.removeItem(reportKey);
+      setUploadedReport(null);
+    }
+  }, [reportKey]);
 
   const fetchAllData = async () => {
     try {
@@ -147,7 +180,296 @@ export default function Reports() {
   const netProfit = totalHarvestIncome - totalExpenses;
   const selectedVillageText = displayText(selectedVillage);
 
+  const sanitizeFileNamePart = (value: string) =>
+    value
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+  const formatFileDateTime = (date: Date) => {
+    const pad = (value: number) => value.toString().padStart(2, '0');
+    return [
+      date.getFullYear(),
+      pad(date.getMonth() + 1),
+      pad(date.getDate()),
+      pad(date.getHours()),
+      pad(date.getMinutes()),
+      pad(date.getSeconds()),
+    ].join('-');
+  };
+
+  const createReportFileName = (generatedAt: Date) => {
+    const villageName = sanitizeFileNamePart(selectedVillage || 'All Villages') || 'All-Villages';
+    return `${villageName}-${formatFileDateTime(generatedAt)}.pdf`;
+  };
+
+  const saveUploadedReport = (report: UploadedReport | null) => {
+    if (report) {
+      localStorage.setItem(reportKey, JSON.stringify(report));
+    } else {
+      localStorage.removeItem(reportKey);
+    }
+    setUploadedReport(report);
+  };
+
+  const getGoogleEmail = async (accessToken: string) => {
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      throw new Error('Could not read the selected Google account email');
+    }
+
+    const profile = await response.json();
+    if (!profile.email) {
+      throw new Error('The selected Google account did not return an email address');
+    }
+
+    return String(profile.email);
+  };
+
+  const pdfEscape = (value: string) =>
+    value
+      .normalize('NFKD')
+      .replace(/[^\x20-\x7E]/g, '')
+      .replace(/\\/g, '\\\\')
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)');
+
+  const wrapPdfText = (value: string, maxLength = 88) => {
+    const words = value.split(/\s+/);
+    const lines: string[] = [];
+    let current = '';
+
+    words.forEach((word) => {
+      const next = current ? `${current} ${word}` : word;
+      if (next.length > maxLength && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    });
+
+    if (current) lines.push(current);
+    return lines.length ? lines : [''];
+  };
+
+  const createReportPdfBlob = (generatedAt = new Date()) => {
+    const sections: Array<{ text: string; size?: number; gap?: number }> = [
+      { text: 'Harvesting Machine Management Report', size: 18, gap: 18 },
+      { text: `Harvester: ${username || 'N/A'}` },
+      { text: `Village: ${selectedVillage || 'All Villages'}` },
+      { text: startDate && endDate ? `Period: ${formatDate(startDate)} to ${formatDate(endDate)}` : 'Period: All Records' },
+      { text: `Generated on: ${formatDateTime(generatedAt)}`, gap: 18 },
+      { text: 'Financial Summary', size: 14 },
+      { text: `Total Hours Harvested: ${formatTimeWithColon(totalHours)}` },
+      { text: `Hourly Rate: INR ${hourlyRate.toFixed(0)}/hour` },
+      { text: `Total Harvest Income: INR ${totalHarvestIncome.toFixed(0)}` },
+      { text: `Diesel Cost: INR ${totalDieselCost.toFixed(0)}` },
+      { text: `Service & Repair Cost: INR ${totalServiceCost.toFixed(0)}` },
+      { text: `Total Expenses: INR ${totalExpenses.toFixed(0)}` },
+      { text: `Net Profit: INR ${netProfit.toFixed(0)}`, gap: 18 },
+      { text: 'Harvesting Summary', size: 14 },
+      ...harvestFiltered.map((h) => ({
+        text: `${formatDate(h.date)} | ${h.farmerName} | ${formatTimeWithColon(h.hoursWorked)} hours`,
+      })),
+      { text: harvestFiltered.length ? '' : 'No harvesting records found', gap: 18 },
+      { text: 'Diesel Transactions', size: 14 },
+      ...dieselFiltered.map((d) => ({
+        text: `${formatDate(d.date)} | ${d.litres.toFixed(1)}L | INR ${d.costPerLitre.toFixed(2)}/L | INR ${d.totalCost.toFixed(0)}`,
+      })),
+      { text: dieselFiltered.length ? '' : 'No diesel entries' },
+    ];
+
+    const pages: string[][] = [[]];
+    let y = 760;
+
+    const addLine = (text: string, size = 10, gap = 12) => {
+      if (y < 60) {
+        pages.push([]);
+        y = 760;
+      }
+      pages[pages.length - 1].push(`BT /F1 ${size} Tf 50 ${y} Td (${pdfEscape(text)}) Tj ET`);
+      y -= gap;
+    };
+
+    sections.forEach(({ text, size = 10, gap = 12 }) => {
+      wrapPdfText(text).forEach((line) => addLine(line, size, gap));
+      if (!text && gap > 12) y -= gap - 12;
+    });
+
+    const objects: string[] = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      `<< /Type /Pages /Kids [${pages.map((_, index) => `${index + 3} 0 R`).join(' ')}] /Count ${pages.length} >>`,
+    ];
+
+    pages.forEach((page, index) => {
+      const contentObjectNumber = pages.length + 3 + index;
+      objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents ${contentObjectNumber} 0 R >>`);
+    });
+
+    pages.forEach((page) => {
+      const stream = page.join('\n');
+      objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+    });
+
+    let pdf = '%PDF-1.4\n';
+    const offsets = [0];
+
+    objects.forEach((object, index) => {
+      offsets.push(pdf.length);
+      pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    });
+
+    const xrefOffset = pdf.length;
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    offsets.slice(1).forEach((offset) => {
+      pdf += `${offset.toString().padStart(10, '0')} 00000 n \n`;
+    });
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+    return new Blob([pdf], { type: 'application/pdf' });
+  };
+
+  const uploadPdfToDrive = async (accessToken: string, googleEmail: string, pdfBlob: Blob, fileName: string) => {
+    const metadata = {
+      name: fileName,
+      mimeType: 'application/pdf',
+      appProperties: {
+        myharvoReportKey: reportKey,
+        myharvoVillage: selectedVillage || 'all',
+        myharvoGoogleEmail: googleEmail,
+      },
+    };
+    const boundary = `myharvo_${Date.now()}`;
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelimiter = `\r\n--${boundary}--`;
+    const body = new Blob(
+      [
+        delimiter,
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n',
+        JSON.stringify(metadata),
+        delimiter,
+        'Content-Type: application/pdf\r\n\r\n',
+        pdfBlob,
+        closeDelimiter,
+      ],
+      { type: `multipart/related; boundary=${boundary}` }
+    );
+
+    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload PDF to Google Drive');
+    }
+
+    const uploaded = await response.json();
+    return {
+      fileId: uploaded.id,
+      fileName: uploaded.name,
+      googleEmail,
+      webViewLink: uploaded.webViewLink,
+    } as UploadedReport;
+  };
+
+  const findUploadedDriveReport = async (accessToken: string, googleEmail: string) => {
+    const escapedReportKey = reportKey.replace(/'/g, "\\'");
+    const escapedGoogleEmail = googleEmail.replace(/'/g, "\\'");
+    const query = encodeURIComponent(
+      `appProperties has { key='myharvoReportKey' and value='${escapedReportKey}' } and appProperties has { key='myharvoGoogleEmail' and value='${escapedGoogleEmail}' } and trashed=false`
+    );
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&spaces=drive&fields=files(id,name,webViewLink)&pageSize=1`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const file = data.files?.[0];
+    return file
+      ? ({ fileId: file.id, fileName: file.name, googleEmail, webViewLink: file.webViewLink } as UploadedReport)
+      : null;
+  };
+
+  const deleteDriveReport = async (accessToken: string, fileId: string) => {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok && response.status !== 404) {
+      throw new Error('Failed to delete PDF from Google Drive');
+    }
+  };
+
+  const handleDriveButtonClick = async () => {
+    if (!selectedVillage) {
+      alert(t('Please select a village before uploading the report'));
+      return;
+    }
+
+    try {
+      setDriveBusy(true);
+      const accessToken = await getGoogleAccessToken(GOOGLE_SCOPE);
+      const googleEmail = await getGoogleEmail(accessToken);
+
+      if (uploadedReport) {
+        if (uploadedReport.googleEmail !== googleEmail) {
+          alert(`This PDF was uploaded with ${uploadedReport.googleEmail}. Please choose that Google account to delete it.`);
+          return;
+        }
+
+        const shouldDelete = window.confirm(t('Do you want to delete the existing uploaded PDF?'));
+        if (!shouldDelete) return;
+
+        await deleteDriveReport(accessToken, uploadedReport.fileId);
+        saveUploadedReport(null);
+        alert(t('Uploaded PDF deleted from Google Drive'));
+        return;
+      }
+
+      const existingReport = await findUploadedDriveReport(accessToken, googleEmail);
+      if (existingReport) {
+        saveUploadedReport(existingReport);
+        const shouldDelete = window.confirm(t('This report is already uploaded. Do you want to delete the existing uploaded PDF?'));
+        if (!shouldDelete) return;
+
+        await deleteDriveReport(accessToken, existingReport.fileId);
+        saveUploadedReport(null);
+        alert(t('Uploaded PDF deleted from Google Drive'));
+        return;
+      }
+
+      const generatedAt = new Date();
+      const uploaded = await uploadPdfToDrive(
+        accessToken,
+        googleEmail,
+        createReportPdfBlob(generatedAt),
+        createReportFileName(generatedAt)
+      );
+      saveUploadedReport(uploaded);
+      alert(`${t('Report uploaded to Google Drive')}: ${googleEmail}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : t('Google Drive action failed'));
+    } finally {
+      setDriveBusy(false);
+    }
+  };
+
   const handlePrint = () => {
+    const generatedAt = new Date();
+    const printFileName = createReportFileName(generatedAt);
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -155,7 +477,7 @@ export default function Reports() {
       <!DOCTYPE html>
       <html lang="${language}">
       <head>
-        <title>${t('Harvesting Machine Management Report')} - ${escapeHtml(selectedVillageText)}</title>
+        <title>${escapeHtml(printFileName)}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: white; }
@@ -188,7 +510,7 @@ export default function Reports() {
             <p>${t('Harvester')}: <strong>${escapeHtml(displayText(username || 'N/A'))}</strong></p>
             <p>${t('Village')}: <strong>${escapeHtml(selectedVillageText)}</strong></p>
             <p>${startDate && endDate ? `${t('Period')}: ${formatDate(startDate)} ${t('to')} ${formatDate(endDate)}` : t('All Records')}</p>
-            <p>${t('Generated on')}: ${formatDateTime(new Date())}</p>
+            <p>${t('Generated on')}: ${formatDateTime(generatedAt)}</p>
           </div>
 
           <div class="section">
@@ -445,6 +767,28 @@ export default function Reports() {
       </div>
 
       <div className="flex gap-2 justify-end">
+        <div className="flex flex-col items-end gap-1">
+          <Button
+            onClick={handleDriveButtonClick}
+            disabled={driveBusy || !selectedVillage}
+            className={`text-white flex items-center gap-2 ${
+              uploadedReport ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-700 hover:bg-slate-600'
+            }`}
+            title={uploadedReport ? `${t('Uploaded to Google Drive')}: ${uploadedReport.googleEmail}` : t('Upload report to Google Drive')}
+          >
+            {driveBusy ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : uploadedReport ? (
+              <Check className="w-4 h-4" />
+            ) : (
+              <UploadCloud className="w-4 h-4" />
+            )}
+            {uploadedReport ? t('Uploaded') : t('Upload')}
+          </Button>
+          {uploadedReport && (
+            <span className="max-w-[220px] truncate text-xs text-slate-400">{uploadedReport.googleEmail}</span>
+          )}
+        </div>
         <Button
           onClick={handlePrint}
           className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
