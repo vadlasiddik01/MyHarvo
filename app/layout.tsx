@@ -6,23 +6,16 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'MyHarvo - Siddik Harvesting Machine Management',
   description: 'Track harvesting records, diesel costs, and services for your harvesting machine',
-  generator: 'v0.app',
+  generator: 'MyHarvo',
   icons: {
     icon: [
       {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        url: '/myharvo-logo.jpg',
+        type: 'image/jpeg',
       },
     ],
-    apple: '/apple-icon.png',
+    shortcut: '/myharvo-logo.jpg',
+    apple: '/myharvo-logo.jpg',
   },
 }
 
