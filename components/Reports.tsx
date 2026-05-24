@@ -40,6 +40,7 @@ interface UploadedReport {
   fileId: string;
   fileName: string;
   googleEmail: string;
+  generatedAt: string;
   webViewLink?: string;
 }
 
@@ -78,7 +79,7 @@ export default function Reports() {
     try {
       const stored = localStorage.getItem(reportKey);
       const parsed = stored ? JSON.parse(stored) : null;
-      setUploadedReport(parsed?.fileId && parsed?.googleEmail ? parsed : null);
+      setUploadedReport(parsed?.fileId && parsed?.googleEmail && parsed?.fileName ? parsed : null);
     } catch {
       localStorage.removeItem(reportKey);
       setUploadedReport(null);
@@ -335,12 +336,20 @@ export default function Reports() {
     return new Blob([pdf], { type: 'application/pdf' });
   };
 
-  const uploadPdfToDrive = async (accessToken: string, googleEmail: string, pdfBlob: Blob, fileName: string) => {
+  const uploadPdfToDrive = async (
+    accessToken: string,
+    googleEmail: string,
+    pdfBlob: Blob,
+    fileName: string,
+    generatedAt: Date
+  ) => {
     const metadata = {
       name: fileName,
       mimeType: 'application/pdf',
       appProperties: {
         myharvoReportKey: reportKey,
+        myharvoReportFileName: fileName,
+        myharvoGeneratedAt: generatedAt.toISOString(),
         myharvoVillage: selectedVillage || 'all',
         myharvoGoogleEmail: googleEmail,
       },
@@ -379,27 +388,9 @@ export default function Reports() {
       fileId: uploaded.id,
       fileName: uploaded.name,
       googleEmail,
+      generatedAt: generatedAt.toISOString(),
       webViewLink: uploaded.webViewLink,
     } as UploadedReport;
-  };
-
-  const findUploadedDriveReport = async (accessToken: string, googleEmail: string) => {
-    const escapedReportKey = reportKey.replace(/'/g, "\\'");
-    const escapedGoogleEmail = googleEmail.replace(/'/g, "\\'");
-    const query = encodeURIComponent(
-      `appProperties has { key='myharvoReportKey' and value='${escapedReportKey}' } and appProperties has { key='myharvoGoogleEmail' and value='${escapedGoogleEmail}' } and trashed=false`
-    );
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&spaces=drive&fields=files(id,name,webViewLink)&pageSize=1`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const file = data.files?.[0];
-    return file
-      ? ({ fileId: file.id, fileName: file.name, googleEmail, webViewLink: file.webViewLink } as UploadedReport)
-      : null;
   };
 
   const deleteDriveReport = async (accessToken: string, fileId: string) => {
@@ -430,36 +421,26 @@ export default function Reports() {
           return;
         }
 
-        const shouldDelete = window.confirm(t('Do you want to delete the existing uploaded PDF?'));
+        const shouldDelete = window.confirm(`Delete this uploaded PDF?\n\n${uploadedReport.fileName}`);
         if (!shouldDelete) return;
 
         await deleteDriveReport(accessToken, uploadedReport.fileId);
         saveUploadedReport(null);
-        alert(t('Uploaded PDF deleted from Google Drive'));
-        return;
-      }
-
-      const existingReport = await findUploadedDriveReport(accessToken, googleEmail);
-      if (existingReport) {
-        saveUploadedReport(existingReport);
-        const shouldDelete = window.confirm(t('This report is already uploaded. Do you want to delete the existing uploaded PDF?'));
-        if (!shouldDelete) return;
-
-        await deleteDriveReport(accessToken, existingReport.fileId);
-        saveUploadedReport(null);
-        alert(t('Uploaded PDF deleted from Google Drive'));
+        alert(`${t('Uploaded PDF deleted from Google Drive')}: ${uploadedReport.fileName}`);
         return;
       }
 
       const generatedAt = new Date();
+      const fileName = createReportFileName(generatedAt);
       const uploaded = await uploadPdfToDrive(
         accessToken,
         googleEmail,
         createReportPdfBlob(generatedAt),
-        createReportFileName(generatedAt)
+        fileName,
+        generatedAt
       );
       saveUploadedReport(uploaded);
-      alert(`${t('Report uploaded to Google Drive')}: ${googleEmail}`);
+      alert(`${t('Report uploaded to Google Drive')}: ${fileName}`);
     } catch (error) {
       alert(error instanceof Error ? error.message : t('Google Drive action failed'));
     } finally {
@@ -774,7 +755,11 @@ export default function Reports() {
             className={`text-white flex items-center gap-2 ${
               uploadedReport ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-700 hover:bg-slate-600'
             }`}
-            title={uploadedReport ? `${t('Uploaded to Google Drive')}: ${uploadedReport.googleEmail}` : t('Upload report to Google Drive')}
+            title={
+              uploadedReport
+                ? `${t('Uploaded to Google Drive')}: ${uploadedReport.fileName}`
+                : t('Upload report to Google Drive')
+            }
           >
             {driveBusy ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -786,7 +771,9 @@ export default function Reports() {
             {uploadedReport ? t('Uploaded') : t('Upload')}
           </Button>
           {uploadedReport && (
-            <span className="max-w-[220px] truncate text-xs text-slate-400">{uploadedReport.googleEmail}</span>
+            <span className="max-w-[260px] truncate text-xs text-slate-400" title={uploadedReport.fileName}>
+              {uploadedReport.fileName}
+            </span>
           )}
         </div>
         <Button
