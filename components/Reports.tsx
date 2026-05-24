@@ -240,67 +240,211 @@ export default function Reports() {
       .replace(/\(/g, '\\(')
       .replace(/\)/g, '\\)');
 
-  const wrapPdfText = (value: string, maxLength = 88) => {
-    const words = value.split(/\s+/);
-    const lines: string[] = [];
-    let current = '';
-
-    words.forEach((word) => {
-      const next = current ? `${current} ${word}` : word;
-      if (next.length > maxLength && current) {
-        lines.push(current);
-        current = word;
-      } else {
-        current = next;
-      }
-    });
-
-    if (current) lines.push(current);
-    return lines.length ? lines : [''];
-  };
-
   const createReportPdfBlob = (generatedAt = new Date()) => {
-    const sections: Array<{ text: string; size?: number; gap?: number }> = [
-      { text: 'Harvesting Machine Management Report', size: 18, gap: 18 },
-      { text: `Harvester: ${username || 'N/A'}` },
-      { text: `Village: ${selectedVillage || 'All Villages'}` },
-      { text: startDate && endDate ? `Period: ${formatDate(startDate)} to ${formatDate(endDate)}` : 'Period: All Records' },
-      { text: `Generated on: ${formatDateTime(generatedAt)}`, gap: 18 },
-      { text: 'Financial Summary', size: 14 },
-      { text: `Total Hours Harvested: ${formatTimeWithColon(totalHours)}` },
-      { text: `Hourly Rate: INR ${hourlyRate.toFixed(0)}/hour` },
-      { text: `Total Harvest Income: INR ${totalHarvestIncome.toFixed(0)}` },
-      { text: `Diesel Cost: INR ${totalDieselCost.toFixed(0)}` },
-      { text: `Service & Repair Cost: INR ${totalServiceCost.toFixed(0)}` },
-      { text: `Total Expenses: INR ${totalExpenses.toFixed(0)}` },
-      { text: `Net Profit: INR ${netProfit.toFixed(0)}`, gap: 18 },
-      { text: 'Harvesting Summary', size: 14 },
-      ...harvestFiltered.map((h) => ({
-        text: `${formatDate(h.date)} | ${h.farmerName} | ${formatTimeWithColon(h.hoursWorked)} hours`,
-      })),
-      { text: harvestFiltered.length ? '' : 'No harvesting records found', gap: 18 },
-      { text: 'Diesel Transactions', size: 14 },
-      ...dieselFiltered.map((d) => ({
-        text: `${formatDate(d.date)} | ${d.litres.toFixed(1)}L | INR ${d.costPerLitre.toFixed(2)}/L | INR ${d.totalCost.toFixed(0)}`,
-      })),
-      { text: dieselFiltered.length ? '' : 'No diesel entries' },
-    ];
-
     const pages: string[][] = [[]];
-    let y = 760;
+    const pageWidth = 612;
+    const pageHeight = 792;
+    const margin = 40;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 748;
 
-    const addLine = (text: string, size = 10, gap = 12) => {
-      if (y < 60) {
-        pages.push([]);
-        y = 760;
-      }
-      pages[pages.length - 1].push(`BT /F1 ${size} Tf 50 ${y} Td (${pdfEscape(text)}) Tj ET`);
-      y -= gap;
+    const currentPage = () => pages[pages.length - 1];
+    const textWidth = (value: string, size: number) => value.length * size * 0.52;
+    const fitText = (value: string, maxChars: number) =>
+      value.length > maxChars ? `${value.slice(0, Math.max(0, maxChars - 3))}...` : value;
+
+    const add = (operator: string) => currentPage().push(operator);
+    const setFill = (r: number, g: number, b: number) => add(`${r} ${g} ${b} rg`);
+    const setStroke = (r: number, g: number, b: number) => add(`${r} ${g} ${b} RG`);
+    const rect = (x: number, top: number, width: number, height: number, mode = 'S') => {
+      add(`${x} ${top - height} ${width} ${height} re ${mode}`);
+    };
+    const line = (x1: number, y1: number, x2: number, y2: number) => {
+      add(`${x1} ${y1} m ${x2} ${y2} l S`);
+    };
+    const text = (
+      value: string,
+      x: number,
+      baseline: number,
+      size = 10,
+      font = 'F1',
+      align: 'left' | 'center' | 'right' = 'left'
+    ) => {
+      const offset =
+        align === 'center' ? textWidth(value, size) / 2 : align === 'right' ? textWidth(value, size) : 0;
+      add(`BT /${font} ${size} Tf ${Math.round((x - offset) * 100) / 100} ${baseline} Td (${pdfEscape(value)}) Tj ET`);
     };
 
-    sections.forEach(({ text, size = 10, gap = 12 }) => {
-      wrapPdfText(text).forEach((line) => addLine(line, size, gap));
-      if (!text && gap > 12) y -= gap - 12;
+    const ensureSpace = (height: number) => {
+      if (y - height < 58) {
+        pages.push([]);
+        y = 748;
+      }
+    };
+
+    const sectionTitle = (title: string) => {
+      ensureSpace(34);
+      y -= 8;
+      setStroke(0.82, 0.84, 0.88);
+      text(title, margin, y, 13, 'F2');
+      line(margin, y - 8, pageWidth - margin, y - 8);
+      y -= 26;
+    };
+
+    const emptyMessage = (message: string) => {
+      ensureSpace(30);
+      setFill(0.42, 0.45, 0.5);
+      text(message, pageWidth / 2, y - 15, 10, 'F1', 'center');
+      y -= 34;
+    };
+
+    const drawHeader = () => {
+      setFill(0.1, 0.12, 0.16);
+      text('Harvesting Machine Management Report', pageWidth / 2, y, 18, 'F2', 'center');
+      y -= 18;
+      setStroke(0.18, 0.2, 0.24);
+      line(margin, y, pageWidth - margin, y);
+      y -= 22;
+
+      const metadata = [
+        ['Harvester', displayText(username || 'N/A')],
+        ['Village', selectedVillageText || 'All Villages'],
+        [
+          'Period',
+          startDate && endDate ? `${formatDate(startDate)} to ${formatDate(endDate)}` : 'All Records',
+        ],
+        ['Generated on', formatDateTime(generatedAt)],
+      ];
+      const boxHeight = 74;
+      setFill(0.97, 0.98, 0.99);
+      setStroke(0.86, 0.88, 0.91);
+      rect(margin, y, contentWidth, boxHeight, 'B');
+      let rowY = y - 18;
+      metadata.forEach(([label, value], index) => {
+        const x = index % 2 === 0 ? margin + 18 : margin + 280;
+        if (index === 2) rowY -= 28;
+        setFill(0.38, 0.41, 0.46);
+        text(`${label}:`, x, rowY, 9, 'F2');
+        setFill(0.12, 0.14, 0.18);
+        text(fitText(value, 33), x + 68, rowY, 9, 'F1');
+      });
+      y -= boxHeight + 18;
+    };
+
+    const drawTable = (
+      columns: Array<{ label: string; x: number; width: number; align?: 'left' | 'right' }>,
+      rows: string[][],
+      noRowsText: string
+    ) => {
+      if (!rows.length) {
+        emptyMessage(noRowsText);
+        return;
+      }
+
+      const rowHeight = 24;
+      const headerHeight = 24;
+
+      const drawTableHeader = () => {
+        setFill(0.94, 0.95, 0.96);
+        setStroke(0.84, 0.86, 0.89);
+        rect(margin, y, contentWidth, headerHeight, 'B');
+        columns.forEach((column) => {
+          setFill(0.16, 0.18, 0.22);
+          const x = column.align === 'right' ? column.x + column.width - 8 : column.x + 8;
+          text(column.label, x, y - 16, 9, 'F2', column.align || 'left');
+        });
+        y -= headerHeight;
+      };
+
+      ensureSpace(headerHeight + rowHeight);
+      drawTableHeader();
+      rows.forEach((row, rowIndex) => {
+        ensureSpace(rowHeight + 6);
+        if (y === 748) drawTableHeader();
+        if (rowIndex % 2 === 0) {
+          setFill(0.99, 0.99, 0.99);
+          rect(margin, y, contentWidth, rowHeight, 'f');
+        }
+        setStroke(0.9, 0.91, 0.93);
+        line(margin, y - rowHeight, pageWidth - margin, y - rowHeight);
+        row.forEach((cell, cellIndex) => {
+          const column = columns[cellIndex];
+          setFill(0.14, 0.16, 0.2);
+          const x = column.align === 'right' ? column.x + column.width - 8 : column.x + 8;
+          text(fitText(cell, Math.floor(column.width / 5.2)), x, y - 16, 9, 'F1', column.align || 'left');
+        });
+        y -= rowHeight;
+      });
+      y -= 18;
+    };
+
+    const drawSummary = () => {
+      sectionTitle('Financial Summary');
+      const rows = [
+        ['Total Hours Harvested', formatTimeWithColon(totalHours)],
+        ['Hourly Rate', `INR ${hourlyRate.toFixed(0)}/hour`],
+        ['Total Harvest Income', `INR ${totalHarvestIncome.toFixed(0)}`],
+        ['Diesel Cost', `INR ${totalDieselCost.toFixed(0)}`],
+        ['Service & Repair Cost', `INR ${totalServiceCost.toFixed(0)}`],
+        ['Total Expenses', `INR ${totalExpenses.toFixed(0)}`],
+        ['Net Profit', `INR ${netProfit.toFixed(0)}`],
+      ];
+      const rowHeight = 22;
+      const boxHeight = rows.length * rowHeight + 18;
+      ensureSpace(boxHeight + 8);
+      setFill(0.97, 0.98, 0.99);
+      setStroke(0.86, 0.88, 0.91);
+      rect(margin, y, contentWidth, boxHeight, 'B');
+      y -= 18;
+      rows.forEach(([label, value], index) => {
+        const isTotal = index === 2 || index === 5 || index === 6;
+        if (isTotal) {
+          setStroke(0.86, 0.88, 0.91);
+          line(margin + 16, y + 8, pageWidth - margin - 16, y + 8);
+        }
+        setFill(index === 6 ? (netProfit >= 0 ? 0.1 : 0.8) : 0.14, index === 6 ? (netProfit >= 0 ? 0.55 : 0.15) : 0.16, index === 6 ? (netProfit >= 0 ? 0.25 : 0.15) : 0.2);
+        text(label, margin + 18, y, isTotal ? 10 : 9, isTotal ? 'F2' : 'F1');
+        text(value, pageWidth - margin - 18, y, isTotal ? 10 : 9, isTotal ? 'F2' : 'F1', 'right');
+        y -= rowHeight;
+      });
+      y -= 14;
+    };
+
+    drawHeader();
+    sectionTitle('Harvesting Summary');
+    drawTable(
+      [
+        { label: 'Date', x: margin, width: 118 },
+        { label: 'Farmer', x: margin + 118, width: 274 },
+        { label: 'Hours', x: margin + 392, width: 140, align: 'right' },
+      ],
+      harvestFiltered.map((h) => [formatDate(h.date), displayText(h.farmerName), formatTimeWithColon(h.hoursWorked)]),
+      'No harvesting records found'
+    );
+
+    sectionTitle('Diesel Transactions');
+    drawTable(
+      [
+        { label: 'Date', x: margin, width: 120 },
+        { label: 'Litres', x: margin + 120, width: 110, align: 'right' },
+        { label: 'Rate (INR/L)', x: margin + 230, width: 150, align: 'right' },
+        { label: 'Total (INR)', x: margin + 380, width: 152, align: 'right' },
+      ],
+      dieselFiltered.map((d) => [
+        formatDate(d.date),
+        d.litres.toFixed(1),
+        d.costPerLitre.toFixed(2),
+        d.totalCost.toFixed(0),
+      ]),
+      'No diesel entries'
+    );
+
+    drawSummary();
+
+    pages.forEach((page, index) => {
+      page.push('0.56 0.58 0.62 rg');
+      page.push(`BT /F1 8 Tf 40 30 Td (${pdfEscape('This report was generated by Harvesting Machine Management System')}) Tj ET`);
+      page.push(`BT /F1 8 Tf 540 30 Td (${index + 1}/${pages.length}) Tj ET`);
     });
 
     const objects: string[] = [
@@ -310,7 +454,7 @@ export default function Reports() {
 
     pages.forEach((page, index) => {
       const contentObjectNumber = pages.length + 3 + index;
-      objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents ${contentObjectNumber} 0 R >>`);
+      objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> >> >> /Contents ${contentObjectNumber} 0 R >>`);
     });
 
     pages.forEach((page) => {
