@@ -2,6 +2,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Diesel } from '@/lib/schemas';
 import { getAuthCookie, verifyToken } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
+import { exactNameRegex, normalizeNameFields } from '@/lib/normalize';
 
 async function getUserId(req: NextRequest): Promise<string | null> {
   const token = await getAuthCookie();
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
     let query: any = { userId };
 
     if (village) {
-      query.village = village;
+      query.village = exactNameRegex(village);
     }
 
     if (startDate || endDate) {
@@ -45,7 +46,10 @@ export async function GET(req: NextRequest) {
     }
 
     const records = await Diesel.find(query).sort({ date: -1 });
-    return NextResponse.json(records);
+    const normalizedRecords = records.map((record) =>
+      normalizeNameFields(record.toObject(), ['village'])
+    );
+    return NextResponse.json(normalizedRecords);
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to fetch diesel records' },
@@ -67,7 +71,7 @@ export async function POST(req: NextRequest) {
     await connectDB();
     const data = await req.json();
 
-    const record = new Diesel({ ...data, userId });
+    const record = new Diesel({ ...normalizeNameFields(data, ['village']), userId });
     await record.save();
 
     return NextResponse.json(record, { status: 201 });

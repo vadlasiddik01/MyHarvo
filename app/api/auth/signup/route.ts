@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { User } from '@/lib/schemas';
 import { hashPassword, hashPin, setAuthCookie, createToken } from '@/lib/auth';
+import { exactNameRegex, normalizeName } from '@/lib/normalize';
 
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
     const body = await req.json();
-    const { username, usernameHi = '', usernameTe = '', password, pin } = body;
+    const { password, pin } = body;
+    const username = normalizeName(body.username);
 
     // Validation
     if (!username || !password || !pin) {
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if username exists
-    const existingUser = await User.findOne({ username });
+    const existingUser = await User.findOne({ username: exactNameRegex(username) });
     if (existingUser) {
       return NextResponse.json(
         { error: 'Username already exists' },
@@ -47,8 +49,6 @@ export async function POST(req: NextRequest) {
     // Create user
     const newUser = new User({
       username,
-      usernameHi,
-      usernameTe,
       passwordHash,
       pinHash,
     });
@@ -64,8 +64,6 @@ export async function POST(req: NextRequest) {
         success: true,
         userId: newUser._id,
         username: newUser.username,
-        usernameHi: newUser.usernameHi || '',
-        usernameTe: newUser.usernameTe || '',
       },
       { status: 201 }
     );

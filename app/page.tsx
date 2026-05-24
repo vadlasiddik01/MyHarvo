@@ -16,8 +16,8 @@ import { LanguageToggle, useLanguage } from '@/lib/languageContext';
 
 export default function Page() {
   const router = useRouter();
-  const { userId, username, usernameHi, usernameTe, isLoggedIn, logout, checkAuth } = useAuth();
-  const { t, displayExact } = useLanguage();
+  const { userId, username, isLoggedIn, logout, checkAuth } = useAuth();
+  const { t, displayText, displayExact } = useLanguage();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mounted, setMounted] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -64,7 +64,7 @@ export default function Page() {
               <LanguageToggle />
               <div className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
                 <User size={18} className="text-blue-400" />
-                <span className="text-white font-medium">{displayExact(username, usernameHi, usernameTe)}</span>
+                <span className="text-white font-medium">{displayText(username)}</span>
               </div>
               <Button
                 onClick={() => setShowProfile(true)}

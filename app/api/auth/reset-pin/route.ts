@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { User } from '@/lib/schemas';
 import { comparePassword, hashPin } from '@/lib/auth';
+import { exactNameRegex, normalizeName } from '@/lib/normalize';
 
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
     const body = await req.json();
-    const { username, password, newPin } = body;
+    const { password, newPin } = body;
+    const username = normalizeName(body.username);
 
     // Validation
     if (!username || !password || !newPin) {
@@ -25,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Find user
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: exactNameRegex(username) });
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid username or password' },

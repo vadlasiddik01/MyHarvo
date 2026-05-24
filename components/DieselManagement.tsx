@@ -5,12 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trash2, Edit2, Plus } from 'lucide-react';
 import { formatLocalizedDate, useLanguage } from '@/lib/languageContext';
+import { normalizeName, normalizeNameFields } from '@/lib/normalize';
 
 interface DieselRecord {
   _id: string;
   village: string;
-  villageHi?: string;
-  villageTe?: string;
   date: string;
   litres: number;
   costPerLitre: number;
@@ -19,7 +18,7 @@ interface DieselRecord {
 }
 
 export default function DieselManagement() {
-  const { language, t, displayText, displayExact } = useLanguage();
+  const { language, t, displayText } = useLanguage();
   const [records, setRecords] = useState<DieselRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -29,8 +28,6 @@ export default function DieselManagement() {
 
   const [formData, setFormData] = useState({
     village: '',
-    villageHi: '',
-    villageTe: '',
     date: new Date().toISOString().split('T')[0],
     litres: 0,
     costPerLitre: 0,
@@ -50,9 +47,13 @@ export default function DieselManagement() {
         : '/api/diesel';
       const res = await fetch(url);
       const data = await res.json();
-      setRecords(data);
+      const normalizedData = data.map((record: DieselRecord) => ({
+        ...record,
+        village: normalizeName(record.village),
+      }));
+      setRecords(normalizedData);
 
-      const uniqueVillages = [...new Set<string>(data.map((r: DieselRecord) => r.village))];
+      const uniqueVillages = [...new Set<string>(normalizedData.map((r: DieselRecord) => r.village))];
       setVillages(uniqueVillages);
     } catch (error) {
       console.error('Failed to fetch records:', error);
@@ -84,7 +85,7 @@ export default function DieselManagement() {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(normalizeNameFields(formData, ['village'])),
       });
 
       if (response.ok) {
@@ -105,8 +106,6 @@ export default function DieselManagement() {
     setEditingRecord(record);
     setFormData({
       village: record.village,
-      villageHi: record.villageHi || '',
-      villageTe: record.villageTe || '',
       date: record.date.split('T')[0],
       litres: record.litres,
       costPerLitre: record.costPerLitre,
@@ -132,8 +131,6 @@ export default function DieselManagement() {
   const resetForm = () => {
     setFormData({
       village: '',
-      villageHi: '',
-      villageTe: '',
       date: new Date().toISOString().split('T')[0],
       litres: 0,
       costPerLitre: 0,
@@ -145,8 +142,7 @@ export default function DieselManagement() {
   const totalLitres = records.reduce((sum, r) => sum + r.litres, 0);
   const totalSpent = records.reduce((sum, r) => sum + r.totalCost, 0);
   const getVillageLabel = (village: string) => {
-    const record = records.find((item) => item.village === village);
-    return displayExact(village, record?.villageHi, record?.villageTe);
+    return displayText(village);
   };
 
   return (
@@ -190,28 +186,6 @@ export default function DieselManagement() {
                     onChange={handleInputChange}
                     placeholder="Village name"
                     required
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-200 mb-2">{t('Village')} Hindi</label>
-                  <input
-                    type="text"
-                    name="villageHi"
-                    value={formData.villageHi || ''}
-                    onChange={handleInputChange}
-                    placeholder="गांव का सही नाम"
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-200 mb-2">{t('Village')} Telugu</label>
-                  <input
-                    type="text"
-                    name="villageTe"
-                    value={formData.villageTe || ''}
-                    onChange={handleInputChange}
-                    placeholder="గ్రామం సరైన పేరు"
                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   />
                 </div>
@@ -374,7 +348,7 @@ export default function DieselManagement() {
                       <td className="px-4 py-3 text-slate-200">
                         {formatLocalizedDate(record.date, language)}
                       </td>
-                      <td className="px-4 py-3 text-slate-200">{displayExact(record.village, record.villageHi, record.villageTe)}</td>
+                      <td className="px-4 py-3 text-slate-200">{displayText(record.village)}</td>
                       <td className="px-4 py-3 text-right text-slate-200">
                         {record.litres.toFixed(1)}
                       </td>

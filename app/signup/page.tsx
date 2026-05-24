@@ -6,14 +6,13 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/authContext';
 import { LanguageToggle, useLanguage } from '@/lib/languageContext';
 import { AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { normalizeName } from '@/lib/normalize';
 
 export default function SignupPage() {
   const router = useRouter();
   const { setUser } = useAuth();
   const { t } = useLanguage();
   const [username, setUsername] = useState('');
-  const [usernameHi, setUsernameHi] = useState('');
-  const [usernameTe, setUsernameTe] = useState('');
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -57,7 +56,7 @@ export default function SignupPage() {
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, usernameHi, usernameTe, password, pin }),
+        body: JSON.stringify({ username: normalizeName(username), password, pin }),
       });
 
       const data = await response.json();
@@ -68,7 +67,7 @@ export default function SignupPage() {
       }
 
       setSuccess(t('Account created successfully! Redirecting...'));
-      setUser(data.userId, data.username, data.usernameHi, data.usernameTe);
+      setUser(data.userId, data.username);
       
       setTimeout(() => {
         router.push('/');
@@ -117,35 +116,6 @@ export default function SignupPage() {
                 disabled={loading}
               />
               <p className="text-xs text-slate-400 mt-1">{t('Can be edited later')}</p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">
-                  {t('Username')} Hindi
-                </label>
-                <input
-                  type="text"
-                  value={usernameHi}
-                  onChange={(e) => setUsernameHi(e.target.value)}
-                  placeholder="सही हिंदी नाम"
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  disabled={loading}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">
-                  {t('Username')} Telugu
-                </label>
-                <input
-                  type="text"
-                  value={usernameTe}
-                  onChange={(e) => setUsernameTe(e.target.value)}
-                  placeholder="సరైన తెలుగు పేరు"
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  disabled={loading}
-                />
-              </div>
             </div>
 
             {/* Password */}

@@ -7,15 +7,12 @@ import { Printer } from 'lucide-react';
 import { formatTimeWithColon } from '@/lib/timeUtils';
 import { useAuth } from '@/lib/authContext';
 import { formatLocalizedDate, getLanguageLocale, useLanguage } from '@/lib/languageContext';
+import { normalizeName } from '@/lib/normalize';
 
 interface HarvestingRecord {
   _id: string;
   village: string;
-  villageHi?: string;
-  villageTe?: string;
   farmerName: string;
-  farmerNameHi?: string;
-  farmerNameTe?: string;
   date: string;
   hoursWorked: number;
   startTime?: string;
@@ -25,8 +22,6 @@ interface HarvestingRecord {
 interface DieselRecord {
   _id: string;
   village: string;
-  villageHi?: string;
-  villageTe?: string;
   date: string;
   litres: number;
   costPerLitre: number;
@@ -41,8 +36,8 @@ interface ServiceRecord {
 }
 
 export default function Reports() {
-  const { username, usernameHi, usernameTe } = useAuth();
-  const { language, t, displayExact } = useLanguage();
+  const { username } = useAuth();
+  const { language, t, displayText } = useLanguage();
   const [harvestingData, setHarvestingData] = useState<HarvestingRecord[]>([]);
   const [dieselData, setDieselData] = useState<DieselRecord[]>([]);
   const [serviceData, setServiceData] = useState<ServiceRecord[]>([]);
@@ -66,8 +61,15 @@ export default function Reports() {
         fetch('/api/service'),
       ]);
 
-      const harvestData = await harvestRes.json();
-      const dieselInfo = await dieselRes.json();
+      const harvestData = (await harvestRes.json()).map((record: HarvestingRecord) => ({
+        ...record,
+        village: normalizeName(record.village),
+        farmerName: normalizeName(record.farmerName),
+      }));
+      const dieselInfo = (await dieselRes.json()).map((record: DieselRecord) => ({
+        ...record,
+        village: normalizeName(record.village),
+      }));
       const serviceInfo = await serviceRes.json();
 
       setHarvestingData(harvestData);
@@ -143,14 +145,7 @@ export default function Reports() {
   const totalServiceCost = serviceData.reduce((sum, r) => sum + r.cost, 0);
   const totalExpenses = totalDieselCost + totalServiceCost;
   const netProfit = totalHarvestIncome - totalExpenses;
-  const selectedVillageRecord =
-    harvestingData.find((record) => record.village === selectedVillage) ||
-    dieselData.find((record) => record.village === selectedVillage);
-  const selectedVillageText = displayExact(
-    selectedVillage,
-    selectedVillageRecord?.villageHi,
-    selectedVillageRecord?.villageTe
-  );
+  const selectedVillageText = displayText(selectedVillage);
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
@@ -190,7 +185,7 @@ export default function Reports() {
         <div class="container">
           <div class="header">
             <h1>${t('Harvesting Machine Management Report')}</h1>
-            <p>${t('Harvester')}: <strong>${escapeHtml(displayExact(username || 'N/A', usernameHi, usernameTe))}</strong></p>
+            <p>${t('Harvester')}: <strong>${escapeHtml(displayText(username || 'N/A'))}</strong></p>
             <p>${t('Village')}: <strong>${escapeHtml(selectedVillageText)}</strong></p>
             <p>${startDate && endDate ? `${t('Period')}: ${formatDate(startDate)} ${t('to')} ${formatDate(endDate)}` : t('All Records')}</p>
             <p>${t('Generated on')}: ${formatDateTime(new Date())}</p>
@@ -210,7 +205,7 @@ export default function Reports() {
                 ${harvestFiltered.map(h => `
                   <tr>
                     <td>${formatDate(h.date)}</td>
-                    <td>${escapeHtml(displayExact(h.farmerName, h.farmerNameHi, h.farmerNameTe))}</td>
+                    <td>${escapeHtml(displayText(h.farmerName))}</td>
                     <td class="text-right">${formatTimeWithColon(h.hoursWorked)}</td>
                   </tr>
                 `).join('')}
@@ -294,13 +289,7 @@ export default function Reports() {
               >
                 {villages.map(v => (
                   <option key={v} value={v}>
-                    {displayExact(
-                      v,
-                      harvestingData.find((record) => record.village === v)?.villageHi ||
-                        dieselData.find((record) => record.village === v)?.villageHi,
-                      harvestingData.find((record) => record.village === v)?.villageTe ||
-                        dieselData.find((record) => record.village === v)?.villageTe
-                    )}
+                    {displayText(v)}
                   </option>
                 ))}
               </select>
@@ -408,7 +397,7 @@ export default function Reports() {
                     {harvestFiltered.map(h => (
                       <tr key={h._id} className="hover:bg-slate-700">
                         <td className="px-2 py-2 text-slate-200 text-xs">{formatDate(h.date, false)}</td>
-                        <td className="px-2 py-2 text-slate-200 text-xs">{displayExact(h.farmerName, h.farmerNameHi, h.farmerNameTe)}</td>
+                        <td className="px-2 py-2 text-slate-200 text-xs">{displayText(h.farmerName)}</td>
                         <td className="px-2 py-2 text-right text-blue-400 text-xs">{formatTimeWithColon(h.hoursWorked)}</td>
                       </tr>
                     ))}

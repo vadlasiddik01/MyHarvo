@@ -2,6 +2,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Harvesting } from '@/lib/schemas';
 import { getAuthCookie, verifyToken } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeNameFields } from '@/lib/normalize';
 
 async function getUserId(req: NextRequest): Promise<string | null> {
   const token = await getAuthCookie();
@@ -34,7 +35,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(record);
+    return NextResponse.json(normalizeNameFields(record.toObject(), ['village', 'farmerName']));
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to fetch record' },
@@ -62,7 +63,7 @@ export async function PATCH(
 
     const record = await Harvesting.findOneAndUpdate(
       { _id: id, userId },
-      data,
+      normalizeNameFields(data, ['village', 'farmerName']),
       { new: true, runValidators: true }
     );
 

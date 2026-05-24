@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, getDatabaseErrorMessage } from '@/lib/mongodb';
 import { User } from '@/lib/schemas';
 import { comparePassword, comparePin, setAuthCookie, createToken } from '@/lib/auth';
+import { exactNameRegex, normalizeName } from '@/lib/normalize';
 
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
     const body = await req.json();
-    const { username, password, pin } = body;
+    const { password, pin } = body;
+    const username = normalizeName(body.username);
 
     // Validation
     if (!username) {
@@ -25,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Find user
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: exactNameRegex(username) });
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid username or password' },
@@ -55,6 +57,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const canonicalUser = user.username === username ? user : await User.findOne({ username });
+    if (user.username !== username && (!canonicalUser || canonicalUser._id.equals(user._id))) {
+      user.username = username;
+      await user.save();
+    }
+
     // Create token and set cookie
     const token = createToken(user._id.toString());
     await setAuthCookie(token);
@@ -64,8 +72,6 @@ export async function POST(req: NextRequest) {
         success: true,
         userId: user._id,
         username: user.username,
-        usernameHi: user.usernameHi || '',
-        usernameTe: user.usernameTe || '',
       },
       { status: 200 }
     );

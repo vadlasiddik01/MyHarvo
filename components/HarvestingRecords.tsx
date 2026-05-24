@@ -7,15 +7,12 @@ import { Trash2, Edit2, Plus } from 'lucide-react';
 import { formatTime, formatTimeRange12Hour, timeStringToDecimal, calculateDuration } from '@/lib/timeUtils';
 import HarvestingForm from './HarvestingForm';
 import { formatLocalizedDate, useLanguage } from '@/lib/languageContext';
+import { normalizeName } from '@/lib/normalize';
 
 interface HarvestingRecord {
   _id: string;
   village: string;
-  villageHi?: string;
-  villageTe?: string;
   farmerName: string;
-  farmerNameHi?: string;
-  farmerNameTe?: string;
   date: string;
   hoursWorked: number;
   startTime?: string;
@@ -24,7 +21,7 @@ interface HarvestingRecord {
 }
 
 export default function HarvestingRecords() {
-  const { language, t, displayText, displayExact } = useLanguage();
+  const { language, t, displayText } = useLanguage();
   const [records, setRecords] = useState<HarvestingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -44,10 +41,15 @@ export default function HarvestingRecords() {
         : '/api/harvesting';
       const res = await fetch(url);
       const data = await res.json();
-      setRecords(data);
+      const normalizedData = data.map((record: HarvestingRecord) => ({
+        ...record,
+        village: normalizeName(record.village),
+        farmerName: normalizeName(record.farmerName),
+      }));
+      setRecords(normalizedData);
 
       // Extract unique villages
-      const uniqueVillages = [...new Set<string>(data.map((r: HarvestingRecord) => r.village))];
+      const uniqueVillages = [...new Set<string>(normalizedData.map((r: HarvestingRecord) => r.village))];
       setVillages(uniqueVillages);
     } catch (error) {
       console.error('Failed to fetch records:', error);
@@ -75,8 +77,7 @@ export default function HarvestingRecords() {
     fetchRecords();
   };
   const getVillageLabel = (village: string) => {
-    const record = records.find((item) => item.village === village);
-    return displayExact(village, record?.villageHi, record?.villageTe);
+    return displayText(village);
   };
 
   return (
@@ -170,8 +171,8 @@ export default function HarvestingRecords() {
                       <td className="px-4 py-3 text-slate-200">
                         {formatLocalizedDate(record.date, language)}
                       </td>
-                      <td className="px-4 py-3 text-slate-200">{displayExact(record.village, record.villageHi, record.villageTe)}</td>
-                      <td className="px-4 py-3 text-slate-200">{displayExact(record.farmerName, record.farmerNameHi, record.farmerNameTe)}</td>
+                      <td className="px-4 py-3 text-slate-200">{displayText(record.village)}</td>
+                      <td className="px-4 py-3 text-slate-200">{displayText(record.farmerName)}</td>
                       <td className="px-4 py-3 text-blue-400 font-semibold">
                         {formatTime(record.hoursWorked)}
                       </td>

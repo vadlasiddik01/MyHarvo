@@ -2,6 +2,7 @@ import { connectDB } from '@/lib/mongodb';
 import { User } from '@/lib/schemas';
 import { getAuthCookie, verifyToken } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
+import { exactNameRegex, normalizeName } from '@/lib/normalize';
 
 async function getUserId(req: NextRequest): Promise<string | null> {
   const token = await getAuthCookie();
@@ -21,7 +22,8 @@ export async function POST(req: NextRequest) {
     }
 
     await connectDB();
-    const { newUsername, usernameHi = '', usernameTe = '' } = await req.json();
+    const body = await req.json();
+    const newUsername = normalizeName(body.newUsername);
 
     if (!newUsername || newUsername.trim().length < 3) {
       return NextResponse.json(
@@ -30,9 +32,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const existingUser = await User.findOne({ username: exactNameRegex(newUsername), _id: { $ne: userId } });
+    if (existingUser) {
+      return NextResponse.json(
+        { error: 'Username already exists' },
+        { status: 409 }
+      );
+    }
+
     const user = await User.findByIdAndUpdate(
       userId,
-      { username: newUsername, usernameHi, usernameTe },
+      { username: newUsername },
       { new: true }
     );
 
@@ -46,8 +56,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       username: newUsername,
-      usernameHi: user.usernameHi || '',
-      usernameTe: user.usernameTe || '',
     });
   } catch (error: any) {
     console.log('[v0] Update username error:', error);

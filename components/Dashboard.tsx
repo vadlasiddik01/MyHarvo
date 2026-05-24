@@ -6,12 +6,11 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { Clock, Droplet, Wrench, TrendingUp } from 'lucide-react';
 import { formatTime, formatTimeWithColon } from '@/lib/timeUtils';
 import { formatLocalizedDate, useLanguage } from '@/lib/languageContext';
+import { normalizeName } from '@/lib/normalize';
 
 interface HarvestingRecord {
   _id: string;
   village: string;
-  villageHi?: string;
-  villageTe?: string;
   hoursWorked: number;
   date: string;
 }
@@ -30,7 +29,7 @@ interface ServiceRecord {
 }
 
 export default function Dashboard() {
-  const { language, t, displayText, displayExact } = useLanguage();
+  const { language, t, displayText } = useLanguage();
   const [harvestingData, setHarvestingData] = useState<HarvestingRecord[]>([]);
   const [dieselData, setDieselData] = useState<DieselRecord[]>([]);
   const [serviceData, setServiceData] = useState<ServiceRecord[]>([]);
@@ -45,8 +44,20 @@ export default function Dashboard() {
           fetch('/api/service'),
         ]);
 
-        if (harvestRes.ok) setHarvestingData(await harvestRes.json());
-        if (dieselRes.ok) setDieselData(await dieselRes.json());
+        if (harvestRes.ok) {
+          const harvestData = await harvestRes.json();
+          setHarvestingData(harvestData.map((record: HarvestingRecord) => ({
+            ...record,
+            village: normalizeName(record.village),
+          })));
+        }
+        if (dieselRes.ok) {
+          const dieselInfo = await dieselRes.json();
+          setDieselData(dieselInfo.map((record: DieselRecord) => ({
+            ...record,
+            village: normalizeName(record.village),
+          })));
+        }
         if (serviceRes.ok) setServiceData(await serviceRes.json());
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
@@ -69,19 +80,17 @@ export default function Dashboard() {
 
   // Group by village for charts
   const villageHarvesting = harvestingData.reduce((acc: any, record) => {
-    const existing = acc.find((v: any) => v.village === record.village);
+    const village = record.village;
+    const existing = acc.find((v: any) => v.village === village);
     const minutes = toMinutes(record.hoursWorked);
     if (existing) {
       existing.minutes += minutes;
       existing.hours = toHours(existing.minutes);
       existing.count += 1;
-      if (record.villageHi || record.villageTe) {
-        existing.villageLabel = displayExact(record.village, record.villageHi, record.villageTe);
-      }
     } else {
       acc.push({
-        village: record.village,
-        villageLabel: displayExact(record.village, record.villageHi, record.villageTe),
+        village,
+        villageLabel: displayText(village),
         minutes,
         hours: toHours(minutes),
         count: 1,

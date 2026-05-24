@@ -5,15 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { calculateDuration, timeStringToDecimal, formatClock12Hour, formatTimeWithColon } from '@/lib/timeUtils';
 import { useLanguage } from '@/lib/languageContext';
+import { normalizeNameFields } from '@/lib/normalize';
 
 interface HarvestingRecord {
   _id?: string;
   village: string;
-  villageHi?: string;
-  villageTe?: string;
   farmerName: string;
-  farmerNameHi?: string;
-  farmerNameTe?: string;
   date: string;
   hoursWorked: number;
   startTime?: string;
@@ -32,11 +29,7 @@ export default function HarvestingForm({ record, onSubmit, onCancel }: Props) {
   const [entryType, setEntryType] = useState<'timer' | 'manual'>('manual');
   const [formData, setFormData] = useState<HarvestingRecord>({
     village: '',
-    villageHi: '',
-    villageTe: '',
     farmerName: '',
-    farmerNameHi: '',
-    farmerNameTe: '',
     date: new Date().toISOString().split('T')[0],
     hoursWorked: 0,
     startTime: '09:00',
@@ -154,11 +147,12 @@ export default function HarvestingForm({ record, onSubmit, onCancel }: Props) {
       const payload = entryType === 'timer' && runningTimerSeconds > 0
         ? { ...formData, hoursWorked: runningTimerSeconds / 3600 }
         : formData;
+      const normalizedPayload = normalizeNameFields(payload, ['village', 'farmerName']);
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(normalizedPayload),
       });
 
       if (response.ok) {
@@ -204,53 +198,6 @@ export default function HarvestingForm({ record, onSubmit, onCancel }: Props) {
             onChange={handleInputChange}
             placeholder="Enter farmer name"
             required
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-200 mb-2">{t('Village')} Hindi</label>
-          <input
-            type="text"
-            name="villageHi"
-            value={formData.villageHi || ''}
-            onChange={handleInputChange}
-            placeholder="गांव का सही नाम"
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-200 mb-2">{t('Village')} Telugu</label>
-          <input
-            type="text"
-            name="villageTe"
-            value={formData.villageTe || ''}
-            onChange={handleInputChange}
-            placeholder="గ్రామం సరైన పేరు"
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-200 mb-2">{t('Farmer')} Hindi</label>
-          <input
-            type="text"
-            name="farmerNameHi"
-            value={formData.farmerNameHi || ''}
-            onChange={handleInputChange}
-            placeholder="किसान का सही नाम"
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-200 mb-2">{t('Farmer')} Telugu</label>
-          <input
-            type="text"
-            name="farmerNameTe"
-            value={formData.farmerNameTe || ''}
-            onChange={handleInputChange}
-            placeholder="రైతు సరైన పేరు"
             className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
           />
         </div>
